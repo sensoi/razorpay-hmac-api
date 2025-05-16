@@ -15,10 +15,10 @@ app.post('/generate-hmac', (req, res) => {
   }
 
   // ✅ Razorpay uses: payment_id|order_id
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${payment_id}|${order_id}`)
-    .digest('hex');
+  const generated_signature = crypto
+  .createHmac('sha256', secret)
+  .update(`${order_id}|${payment_id}`) 
+  .digest('hex');
 
   res.json({ signature });
 });
