@@ -23,12 +23,24 @@ app.post('/generate-hmac', (req, res) => {
   }
 
   // ✅ Razorpay format: order_id|payment_id
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${order_id}|${payment_id}`)
-    .digest('hex');
+  // ✅ Razorpay format: order_id|payment_id
+const payload = `${order_id}|${payment_id}`;
+const signature = crypto
+  .createHmac('sha256', secret)
+  .update(payload)
+  .digest('hex');
 
-  res.json({ signature });
+// 🧾 Add debug logs
+console.log("------ HMAC DEBUG ------");
+console.log("Order ID:", order_id);
+console.log("Payment ID:", payment_id);
+console.log("Secret:", secret);
+console.log("Payload (order_id|payment_id):", payload);
+console.log("Generated HMAC:", signature);
+console.log("------------------------");
+
+res.json({ signature });
+
 });
 
 // Start the server
