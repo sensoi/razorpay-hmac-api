@@ -1,19 +1,29 @@
+require('dotenv').config();
+const express = require('express');
 const crypto = require('crypto');
+const app = express();
 
-fastify.post('/generate-hmac', async (request, reply) => {
-  const { order_id, payment_id } = request.body;
+app.use(express.json());
+
+// ✅ Razorpay-compatible HMAC route
+app.post('/generate-hmac', (req, res) => {
+  const { order_id, payment_id } = req.body;
   const secret = process.env.RAZORPAY_SECRET;
 
   if (!order_id || !payment_id || !secret) {
-    return reply.code(400).send({ error: 'Missing fields' });
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
-  // ✅ Razorpay requires payment_id first, then order_id
-  const generated_signature = crypto
+  // ✅ Razorpay uses: payment_id|order_id
+  const signature = crypto
     .createHmac('sha256', secret)
-    .update(`${payment_id}|${order_id}`)  // FIXED: swapped order
+    .update(`${payment_id}|${order_id}`)
     .digest('hex');
 
-  return reply.send({ signature: generated_signature });
+  res.json({ signature });
 });
 
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
