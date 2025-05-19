@@ -1,26 +1,19 @@
-// Load environment variables
 require('dotenv').config();
-
-// Import modules
 const express = require('express');
 const crypto = require('crypto');
+const getRawBody = require('raw-body'); // 👈 THIS is key
 
 const app = express();
 
-// ✅ Ensure Razorpay webhooks are parsed correctly as JSON
-app.use(express.json({
-  type: 'application/json',
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString(); // Optional: store raw body if you need HMAC verification for webhook later
-  }
-}));
+// ✅ Use express.json only for /generate-hmac
+app.use('/generate-hmac', express.json());
 
-// ✅ Health check route (optional)
+// Health check
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'HMAC API is live' });
 });
 
-// ✅ Razorpay-compatible HMAC signature generation
+// ✅ Razorpay-compatible HMAC generation (safe)
 app.post('/generate-hmac', (req, res) => {
   const { order_id, payment_id, secret } = req.body;
 
@@ -34,25 +27,34 @@ app.post('/generate-hmac', (req, res) => {
     .update(payload)
     .digest('hex');
 
-  // 🧾 Debug logs
   console.log("------ HMAC DEBUG ------");
   console.log("Order ID:", order_id);
   console.log("Payment ID:", payment_id);
   console.log("Secret:", secret);
-  console.log("Payload (order_id|payment_id):", payload);
+  console.log("Payload:", payload);
   console.log("Generated HMAC:", signature);
   console.log("------------------------");
 
   res.json({ signature });
 });
 
-// Optional: Catch-all POST for debugging unexpected payloads
-app.post('*', (req, res) => {
-  console.log("🛑 Unknown POST received at wildcard route:", req.body);
-  res.status(200).send('OK');
+// ✅ Razorpay Webhook route (use raw-body parsing)
+app.post('/razorpay_webhook', async (req, res) => {
+  try {
+    const raw = await getRawBody(req);
+    const data = JSON.parse(raw.toString()); // 🧠 This will now parse properly
+
+    console.log("✅ Webhook Received:");
+    console.log(data);
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("❌ Webhook Error:", err.message);
+    res.status(400).send("Invalid payload");
+  }
 });
 
-// ✅ Start the server
+// Start server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
