@@ -1,24 +1,26 @@
 // Load environment variables
 require('dotenv').config();
 
-// Import required modules
+// Import modules
 const express = require('express');
 const crypto = require('crypto');
+
 const app = express();
 
-// 🔧 Ensure proper parsing of application/json content
+// ✅ Ensure Razorpay webhooks are parsed correctly as JSON
 app.use(express.json({
+  type: 'application/json',
   verify: (req, res, buf) => {
-    req.rawBody = buf.toString(); // Save raw body if needed
+    req.rawBody = buf.toString(); // Optional: store raw body if you need HMAC verification for webhook later
   }
 }));
 
-// Health check route (optional)
+// ✅ Health check route (optional)
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'HMAC API is live' });
 });
 
-// ✅ Razorpay-compatible HMAC generation
+// ✅ Razorpay-compatible HMAC signature generation
 app.post('/generate-hmac', (req, res) => {
   const { order_id, payment_id, secret } = req.body;
 
@@ -26,7 +28,6 @@ app.post('/generate-hmac', (req, res) => {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
-  // Razorpay format: order_id|payment_id
   const payload = `${order_id}|${payment_id}`;
   const signature = crypto
     .createHmac('sha256', secret)
@@ -45,8 +46,14 @@ app.post('/generate-hmac', (req, res) => {
   res.json({ signature });
 });
 
-// Start the server
+// Optional: Catch-all POST for debugging unexpected payloads
+app.post('*', (req, res) => {
+  console.log("🛑 Unknown POST received at wildcard route:", req.body);
+  res.status(200).send('OK');
+});
+
+// ✅ Start the server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
