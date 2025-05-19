@@ -1,11 +1,13 @@
+// Load environment variables
 require('dotenv').config();
+
+// Import required modules
 const express = require('express');
 const crypto = require('crypto');
-const getRawBody = require('raw-body'); // 👈 THIS is key
 
 const app = express();
 
-// ✅ Use express.json only for /generate-hmac
+// Parse JSON safely
 app.use('/generate-hmac', express.json());
 
 // Health check
@@ -13,9 +15,10 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'HMAC API is live' });
 });
 
-// ✅ Razorpay-compatible HMAC generation (safe)
+// ✅ HMAC generation (Bubble calls this, NO secret passed)
 app.post('/generate-hmac', (req, res) => {
-  const { order_id, payment_id, secret } = req.body;
+  const { order_id, payment_id } = req.body;
+  const secret = process.env.RAZORPAY_SECRET;
 
   if (!order_id || !payment_id || !secret) {
     return res.status(400).json({ error: 'Missing fields' });
@@ -27,10 +30,10 @@ app.post('/generate-hmac', (req, res) => {
     .update(payload)
     .digest('hex');
 
+  // Debug logs
   console.log("------ HMAC DEBUG ------");
   console.log("Order ID:", order_id);
   console.log("Payment ID:", payment_id);
-  console.log("Secret:", secret);
   console.log("Payload:", payload);
   console.log("Generated HMAC:", signature);
   console.log("------------------------");
@@ -38,23 +41,16 @@ app.post('/generate-hmac', (req, res) => {
   res.json({ signature });
 });
 
-// ✅ Razorpay Webhook route (use raw-body parsing)
-app.post('/razorpay_webhook', async (req, res) => {
-  try {
-    const raw = await getRawBody(req);
-    const data = JSON.parse(raw.toString()); // 🧠 This will now parse properly
+// Optional wildcard POST for debugging Razorpay webhooks
+app.use(express.json({ type: 'application/json' }));
 
-    console.log("✅ Webhook Received:");
-    console.log(data);
-
-    res.status(200).json({ success: true });
-  } catch (err) {
-    console.error("❌ Webhook Error:", err.message);
-    res.status(400).send("Invalid payload");
-  }
+app.post('/razorpay_webhook', (req, res) => {
+  console.log("📦 Webhook Received:");
+  console.log(req.body); // log full Razorpay payload
+  res.status(200).send("Webhook received");
 });
 
-// Start server
+// Start the server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
