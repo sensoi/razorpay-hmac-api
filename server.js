@@ -73,15 +73,24 @@ app.post('/rzp-webhook', (req, res) => {
       status: event === 'payment.captured' ? 'success' : 'failure'
     };
 
-    axios.post('https://www.app.nox.today/version-728j5/api/1.1/wf/verify-from-render', dataToSend)
-      .then(() => {
-        console.log("✅ Webhook forwarded to Bubble:", dataToSend);
-        res.json({ status: "Webhook forwarded to Bubble", result: dataToSend });
-      })
-      .catch(err => {
-        console.error("❌ Failed to call Bubble API:", err.message);
-        res.status(500).json({ error: "Bubble call failed" });
-      });
+    axios.post(
+      'https://www.app.nox.today/version-728j5/api/1.1/wf/verify-from-render',
+      dataToSend,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.BUBBLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    .then(() => {
+      console.log("✅ Webhook forwarded to Bubble:", dataToSend);
+      res.json({ status: "Webhook forwarded to Bubble", result: dataToSend });
+    })
+    .catch(err => {
+      console.error("❌ Failed to call Bubble API:", err.response?.data || err.message);
+      res.status(500).json({ error: "Bubble call failed" });
+    });
 
   } else {
     console.warn("❌ Signature mismatch — webhook rejected.");
