@@ -8,7 +8,12 @@ const axios = require('axios'); // for calling Bubble
 
 // Initialize Express app
 const app = express();
+// Use raw body for Razorpay webhook
+app.use('/rzp-webhook', express.raw({ type: 'application/json' }));
+
+// Use normal JSON for everything else
 app.use(express.json());
+
 
 // Health check route
 app.get('/', (req, res) => {
