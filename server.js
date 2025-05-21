@@ -67,7 +67,7 @@ app.post('/rzp-webhook', (req, res) => {
       status: event === 'payment.captured' ? 'success' : 'failure'
     };
 
-    axios.post('https://your-bubble-domain.com/api/1.1/wf/verify-from-render', dataToSend)
+    axios.post('https://www.app.nox.today/version-728j5/api/1.1/wf/verify-from-render', dataToSend)
       .then(() => {
         res.json({ status: "forwarded to Bubble", result: dataToSend });
       })
