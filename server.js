@@ -1,3 +1,93 @@
+require('dotenv').config();
+const express = require('express');
+const crypto = require('crypto');
+const axios = require('axios');
+
+const app = express();
+
+// ✅ Use raw body only for Razorpay webhook
+app.use('/rzp-webhook', express.raw({ type: 'application/json' }));
+// ✅ Use JSON for all other routes
+app.use(express.json());
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'HMAC API is live' });
+});
+
+// ✅ For frontend signature generation
+app.post('/generate-hmac', (req, res) => {
+  const { order_id, payment_id, secret } = req.body;
+  if (!order_id || !payment_id || !secret) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  const payload = `${order_id}|${payment_id}`;
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  console.log("------ HMAC DEBUG ------");
+  console.log("Order ID:", order_id);
+  console.log("Payment ID:", payment_id);
+  console.log("Secret:", secret);
+  console.log("Payload (order_id|payment_id):", payload);
+  console.log("Generated HMAC:", signature);
+  console.log("------------------------");
+
+  res.json({ signature });
+});
+
+// ✅ Razorpay webhook listener
+app.post('/rzp-webhook', (req, res) => {
+  const secret = process.env.RAZORPAY_SECRET;
+  const receivedSignature = req.headers['x-razorpay-signature'];
+  const body = req.body.toString(); // RAW BODY
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(body)
+    .digest('hex');
+
+  console.log("------ WEBHOOK DEBUG ------");
+  console.log("Received Signature:", receivedSignature);
+  console.log("Expected Signature:", expectedSignature);
+  console.log("----------------------------");
+
+  if (receivedSignature === expectedSignature) {
+    const jsonBody = JSON.parse(body);
+    const event = jsonBody.event;
+    const payment = jsonBody.payload?.payment?.entity || {};
+
+    const dataToSend = {
+      payment_id: payment.id,
+      order_id: payment.order_id,
+      amount: payment.amount,
+      status: event === 'payment.captured' ? 'success' : 'failure'
+    };
+
+    axios.post('https://www.app.nox.today/version-728j5/api/1.1/wf/verify-from-render', dataToSend)
+      .then(() => {
+        console.log("✅ Sent verified webhook to Bubble:", dataToSend);
+        res.json({ status: "forwarded to Bubble", result: dataToSend });
+      })
+      .catch(err => {
+        console.error("❌ Error sending to Bubble:", err.message);
+        res.status(500).json({ error: "Failed to notify Bubble" });
+      });
+
+  } else {
+    console.warn("❌ Signature mismatch — webhook rejected.");
+    res.status(401).json({ error: "Invalid Razorpay signature" });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 // Load environment variables
 require('dotenv').config();
 
